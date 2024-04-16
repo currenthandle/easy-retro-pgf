@@ -65,6 +65,8 @@ model Ballot {
     publishedAt DateTime?
     signature   String?
 
+    kzgCommitment String[]
+
     votes Json[]
 
     @@unique([voterId]) // Only one ballot per voter

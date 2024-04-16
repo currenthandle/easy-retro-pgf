@@ -21,6 +21,7 @@ const defaultBallotSelect = {
   updatedAt: true,
   publishedAt: true,
   signature: true,
+  kzgCommitment: true,
 } satisfies Prisma.BallotSelect;
 
 export const ballotRouter = createTRPCRouter({

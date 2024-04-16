@@ -30,6 +30,7 @@ export function useAddToBallot() {
   return useMutation({
     mutationFn: async (votes: Vote[]) => {
       if (ballot) {
+        console.log("ballot before merge", ballot);
         return mutate(mergeBallot(ballot as unknown as Ballot, votes));
       }
     },
@@ -104,12 +105,16 @@ export function ballotContains(id: string, ballot?: Ballot) {
 }
 
 function mergeBallot(ballot: Ballot, addedVotes: Vote[]) {
+  const votes = Object.values<Vote>({
+    ...toObject(ballot?.votes, "projectId"),
+    ...toObject(addedVotes, "projectId"),
+  });
+
+  const kzgCommitment = 'h' // TODO
+
   return {
     ...ballot,
-    votes: Object.values<Vote>({
-      ...toObject(ballot?.votes, "projectId"),
-      ...toObject(addedVotes, "projectId"),
-    }),
+    votes,
   };
 }
 
