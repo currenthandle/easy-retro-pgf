@@ -17,7 +17,8 @@ import { fetchApprovedVoter } from "~/utils/fetchAttestations";
 import engine from "~/ezkl/engine";
 import fs from "fs";
 import path from "path";
-import { fetchAttestations, createDataFilter } from "~/utils/fetchAttestations";
+// import { fetchAttestations, createDataFilter } from "~/utils/fetchAttestations";
+import { parse, stringify } from "json-bigint";
 
 // console.log('path', __dirname);
 // const vk = fs.readFileSync("~/src/ezkl/artifacts/vk.key");
@@ -33,23 +34,61 @@ let vk: Uint8ClampedArray;
 let settings: Uint8ClampedArray;
 let srs: Uint8ClampedArray;
 
+// Attempt to read the VK file
 try {
   const vkBuf = fs.readFileSync(vkPath);
-  const settingsBuf = fs.readFileSync(settingsPath);
-  const srsBuf = fs.readFileSync(srsPath);
-
   vk = new Uint8ClampedArray(vkBuf);
-  settings = new Uint8ClampedArray(settingsBuf);
-  srs = new Uint8ClampedArray(srsBuf);
-
   console.log("VK loaded successfully");
   console.log("VK", vk);
-  console.log("Settings", settings);
-  console.log("SRS", srs);
 } catch (error) {
   console.log("VK Path", vkPath);
   console.error("Error loading the VK:", error);
 }
+
+// Attempt to read the settings file
+try {
+  const settingsBuf = fs.readFileSync(settingsPath);
+  settings = new Uint8ClampedArray(settingsBuf);
+  console.log("Settings loaded successfully");
+  console.log("Settings", settings);
+} catch (error) {
+  console.log("Settings Path", settingsPath);
+  console.error("Error loading the Settings:", error);
+}
+
+// Function to process large files using streams
+function processFile(filePath: string): Promise<Uint8ClampedArray> {
+  return new Promise((resolve, reject) => {
+    const dataChunks: Buffer[] = [];
+    const stream = fs.createReadStream(filePath);
+
+    stream.on("data", (chunk: Buffer) => {
+      dataChunks.push(chunk);
+    });
+
+    stream.on("end", () => {
+      console.log(`${filePath} loaded successfully`);
+      const completeBuffer = Buffer.concat(dataChunks);
+      const dataArray = new Uint8ClampedArray(completeBuffer);
+      resolve(dataArray);
+    });
+
+    stream.on("error", (error) => {
+      console.error(`Error loading the file at ${filePath}:`, error);
+      reject(error);
+    });
+  });
+}
+
+// Use the function to process the SRS file
+processFile(srsPath)
+  .then((srsArray) => {
+    srs = srsArray;
+    console.log("SRS data processed", srs);
+  })
+  .catch((error) => {
+    console.error("Failed to process SRS file", error);
+  });
 
 const defaultBallotSelect = {
   votes: true,
@@ -73,6 +112,8 @@ export const ballotRouter = createTRPCRouter({
   save: protectedProcedure
     .input(BallotSchema)
     .mutation(async ({ input, ctx }) => {
+      console.log("==================================================");
+      console.log("input", input);
       const voterId = ctx.session.user.name!;
       if (isAfter(new Date(), config.votingEndsAt)) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Voting has ended" });
@@ -81,12 +122,18 @@ export const ballotRouter = createTRPCRouter({
 
       const projectCount = await countApprovedProjects();
 
-      // const kzgCommitment = createKZGCommitment(input.votes);
-      const kzgCommitment = createKZGCommitment();
-
       console.log("==================================================");
-      console.log("engine", engine);
-      console.log("input", input);
+      console.log("projectCount", projectCount);
+
+      // const projectCount = { count: 2 };
+
+      // const kzgCommitment = createKZGCommitment(input.votes);
+      const message = genMessage();
+      const kzgCommitment = createKZGCommitment();
+      //
+      // console.log("==================================================");
+      // console.log("engine", engine);
+      // console.log("input", input);
 
       return ctx.db.ballot.upsert({
         select: defaultBallotSelect,
@@ -95,11 +142,27 @@ export const ballotRouter = createTRPCRouter({
         create: { voterId, ...input, kzgCommitment },
       });
 
+      function genMessage() {
+        // todo: sort / put in proper index positions
+        const encoder = new TextEncoder();
+        const decoder = new TextDecoder();
+        const strArr = input.votes.map((vote) => {
+          const felt = engine.floatToFelt(vote.amount, 0);
+          const str = decoder.decode(felt);
+          return parse(str) as string;
+        });
+        const str = stringify(strArr);
+        return new Uint8ClampedArray(encoder.encode(str));
+      }
+
       function createKZGCommitment() {
-        const message: Uint8ClampedArray = new Uint8ClampedArray(32);
         const commitment = engine.kzgCommit(message, vk, settings, srs);
         const commitmentStr = new TextDecoder().decode(commitment);
-        return commitment;
+        const json = parse(commitmentStr);
+
+        console.log("json", json);
+
+        return [commitmentStr];
       }
 
       async function countApprovedProjects() {
