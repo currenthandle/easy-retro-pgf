@@ -17,6 +17,11 @@ export const BallotPublishSchema = z.object({
     project_count: z.bigint(),
     hashed_votes: z.string(),
   }),
+  kzgSignature: z.custom<`0x${string}`>(),
+  kzgMessage: z.object({
+    kzg_commitment: z.string(),
+    // kzg_commitment: z.custom<`(0x${string},0x${string})`>(),
+  }),
 });
 
 export type Vote = z.infer<typeof VoteSchema>;

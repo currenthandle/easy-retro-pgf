@@ -3,7 +3,7 @@ import { useBeforeUnload } from "react-use";
 import { useAccount, useChainId, useSignTypedData } from "wagmi";
 import type { Vote, Ballot } from "~/features/ballot/types";
 
-import { ballotTypedData } from "~/utils/typedData";
+import { ballotTypedData, kzgTypedData } from "~/utils/typedData";
 import { api } from "~/utils/api";
 import { useSession } from "next-auth/react";
 import { keccak256 } from "viem";
@@ -87,7 +87,25 @@ export function useSubmitBallot({
           message,
         });
 
-        return mutateAsync({ signature, message, chainId });
+        const kzgMessage = {
+          kzg_commitment: "(0x1234, 0x5678)" as const,
+        };
+
+        const kzgSignature = await signTypedDataAsync({
+          ...kzgTypedData(chainId),
+          message: kzgMessage,
+        });
+
+        /*
+          TODO: create addtional signature
+          const kzgCommitment = call_lilith(inputJson: string) => kzgCommitment: string 
+          const kzgMessage = {
+            kzgCommitment: kzgCommitment
+          }
+
+        */
+
+        return mutateAsync({ signature, kzgSignature, message, kzgMessage, chainId });
       }
     },
   });

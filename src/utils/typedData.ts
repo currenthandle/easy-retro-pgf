@@ -14,3 +14,19 @@ export const ballotTypedData = (chainId?: number) =>
       ],
     },
   }) as const;
+
+
+export const kzgTypedData = (chainId?: number) =>
+  ({
+    primaryType: "KzgCommitment",
+    domain: {
+      name: "Signed KZG Commitment",
+      version: "1",
+      chainId,
+    },
+    types: {
+      KzgCommitment: [
+        { name: "kzg_commitment", type: "string" },
+      ],
+    },
+  }) as const;

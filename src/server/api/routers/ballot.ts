@@ -91,7 +91,7 @@ export const ballotRouter = createTRPCRouter({
           message: "Votes hash mismatch",
         });
       }
-      const { signature } = input;
+      const { signature, kzgSignature, kzgMessage } = input;
       if (!(await verifyBallotSignature({ ...input, address: voterId }))) {
         throw new TRPCError({
           code: "UNAUTHORIZED",
@@ -99,9 +99,16 @@ export const ballotRouter = createTRPCRouter({
         });
       }
 
+      const kzgCommitment = kzgMessage.kzg_commitment;
+
       return ctx.db.ballot.update({
         where: { voterId },
-        data: { publishedAt: new Date(), signature },
+        data: {
+          publishedAt: new Date(),
+          signature,
+          kzgSignature,
+          kzgCommitment,
+        },
       });
     }),
 });
