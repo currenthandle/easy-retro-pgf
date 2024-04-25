@@ -7,6 +7,7 @@ import { ballotTypedData, kzgTypedData } from "~/utils/typedData";
 import { api } from "~/utils/api";
 import { useSession } from "next-auth/react";
 import { keccak256 } from "viem";
+import { useSearchProjects } from "~/features/projects/hooks/useProjects";
 
 export function useSaveBallot(opts?: { onSuccess?: () => void }) {
   const utils = api.useUtils();
@@ -68,6 +69,24 @@ export function useSubmitBallot({
   const { mutateAsync, isPending } = api.ballot.publish.useMutation({
     onSuccess,
   });
+  const projects = useSearchProjects();
+
+  if (!projects?.data?.pages) {
+    return;
+  }
+
+  const projectMap = new Map<string, number>();
+  const projectIds = projects?.data?.pages
+    .flat()
+    .map((project) => project.id)
+    .sort();
+
+  projectIds.forEach((id) => {
+    projectMap.set(id, -1);
+  });
+
+  // console.log("projectIDs", projectIds);
+
   useBeforeUnload(isPending, "You have unsaved changes, are you sure?");
 
   const { signTypedDataAsync } = useSignTypedData();
@@ -76,6 +95,22 @@ export function useSubmitBallot({
     mutationFn: async () => {
       if (chainId) {
         const { data: ballot } = await refetch();
+        // console.log("votes", ballot?.votes);
+
+        ballot?.votes.forEach((vote) =>
+          projectMap.set(vote.projectId, vote.amount),
+        );
+
+        console.log("projectMap", projectMap);
+        console.log("projectIds", projectIds);
+
+        const inputJson = {
+          input_data: Array.from(projectMap.values()),
+        };
+
+        const inputJsonString = JSON.stringify(inputJson);
+
+        console.log("inputJsonString", inputJsonString);
 
         const message = {
           total_votes: BigInt(sumBallot(ballot?.votes)),
@@ -105,7 +140,13 @@ export function useSubmitBallot({
 
         */
 
-        return mutateAsync({ signature, kzgSignature, message, kzgMessage, chainId });
+        return mutateAsync({
+          signature,
+          kzgSignature,
+          message,
+          kzgMessage,
+          chainId,
+        });
       }
     },
   });
