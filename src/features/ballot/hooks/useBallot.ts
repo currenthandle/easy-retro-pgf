@@ -105,12 +105,14 @@ export function useSubmitBallot({
         console.log("projectIds", projectIds);
 
         const inputJson = {
-          input_data: Array.from(projectMap.values()),
+          input_data: [Array.from(projectMap.values())],
         };
 
         const inputJsonString = JSON.stringify(inputJson);
 
         console.log("inputJsonString", inputJsonString);
+
+        await getKzgCommitment(inputJson);
 
         const message = {
           total_votes: BigInt(sumBallot(ballot?.votes)),
@@ -177,4 +179,67 @@ function toObject(arr: object[] = [], key: string) {
     (acc, x) => ({ ...acc, [x[key as keyof typeof acc]]: x }),
     {},
   );
+}
+
+async function getKzgCommitment(input: { input_data: number[][] }) {
+  const archon = {
+    // API_KEY: process.env.ARCHON_KEY!,
+    // ARCHON_URL: process.env.ARCHON_URL!,
+    ARCHON_KEY: "2fc6ec8d-c492-47f9-97ce-a80603dbfe4b" as const,
+    ARCHON_URL: "https://archon-v0.ezkl.xyz" as const,
+  };
+  const headers = {
+    "X-API-KEY": archon.ARCHON_KEY,
+    "Content-Type": "application/json" as const,
+    accept: "*/*" as const,
+  };
+
+  const commands = [
+    {
+      ezkl_command: {
+        GenWitness: {
+          data: "input.json",
+          compiled_circuit: "model.compiled",
+          output: "witness.json",
+        },
+      },
+      working_dir: "votes-small",
+    },
+    {
+      ezkl_command: {
+        Prove: {
+          witness: "witness.json",
+          compiled_circuit: "model.compiled",
+          pk_path: "pk.key",
+          proof_path: "proof.json",
+          proof_type: "Single",
+          check_mode: "UNSAFE",
+        },
+      },
+      working_dir: "votes-small",
+    },
+  ];
+
+  const body = JSON.stringify({
+    commands,
+    data: [input],
+  });
+
+  console.log("headers", headers);
+  console.log("body", body);
+
+  try {
+    const response = await fetch(`${archon.ARCHON_URL}/recipe`, {
+      method: "POST",
+      headers,
+      body,
+    });
+
+    const json: unknown = await response.json();
+
+    console.log("json", json);
+  } catch (error) {
+    console.error("Error fetching KZG commitment", error);
+    return null;
+  }
 }
