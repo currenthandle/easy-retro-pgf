@@ -115,13 +115,7 @@ export function useSubmitBallot({
 
         const kszResp = await createKzgCommitment(inputJson);
 
-        if (!kszResp) {
-          return;
-        }
-
         const recipe_id = kszResp.id;
-
-        console.log("recipe_id", recipe_id);
 
         await fetchKzgCommitment(recipe_id);
 
@@ -193,11 +187,11 @@ function toObject(arr: object[] = [], key: string) {
 }
 
 function little_endian(proof: number[], bytes: number) {
-  let result = ''
+  let result = "";
   for (let i = 0; i < bytes; i++) {
-    result = proof[i]?.toString(16) + result
+    result = proof[i]?.toString(16) + result;
   }
-  return `0x${result}`
+  return `0x${result}`;
 }
 
 async function fetchKzgCommitment(id: string) {
@@ -219,47 +213,37 @@ async function fetchKzgCommitment(id: string) {
       method: "GET",
       headers,
     });
+    const response_data_schema = z
+      .array(
+        z.object({
+          output: z.string(),
+        }),
+      )
+      .nonempty();
 
-    const json = await response.json();
-    console.log('typeof json', typeof json[0]);
-    console.log('json', json[0]);
+    const json_raw = (await response.json()) as unknown;
+    const json = response_data_schema.parse(json_raw);
 
     const output_str = json[0].output;
-    console.log("output", output_str);
-    console.log("typeof output", typeof output_str);
+    const output_raw = JSON.parse(output_str) as unknown;
 
-    const output = JSON.parse(output_str);
-
+    const output_schema = z.object({
+      proof: z.array(z.number()),
+    });
+    const output = output_schema.parse(output_raw);
     console.log("output", output);
 
     const proof = output.proof;
     console.log("proof", proof);
-    console.log('proof length', proof.length);
+    console.log("proof length", proof.length);
 
     const kzg_commitment = little_endian(proof, 64);
     console.log("kzg_commitment", kzg_commitment);
 
-    // console.log(Object.keys(output));
-
-    // const instances = output.instances;
-    //
-    // console.log("instances", instances);
-
-    // const proof = instances[0].proof;
-    // console.log("proof", proof);
-
-    // const response_schema = z.object({
-    //   id: z.string(),
-    //   was_already_scheduled: z.boolean(),
-    // });
-    //
-    // const data = response_schema.parse(json);
-    //
-    // console.log("data", data);
-    // return data;
+    return kzg_commitment;
   } catch (error) {
     console.error("Error fetching KZG commitment", error);
-    return null;
+    throw error;
   }
 }
 
@@ -328,6 +312,6 @@ async function createKzgCommitment(input: { input_data: number[][] }) {
     return data;
   } catch (error) {
     console.error("Error fetching KZG commitment", error);
-    return null;
+    throw error;
   }
 }
