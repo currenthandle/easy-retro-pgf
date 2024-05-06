@@ -105,8 +105,17 @@ export function useSubmitBallot({
         console.log("projectMap", projectMap);
         console.log("projectIds", projectIds);
 
+        const input_arr = Array.from(projectMap.values())
+
+        // TODO: we'll need the actual number of projects
+        // it will need to coorespond to the number of 
+        // projects in the zk circuit on Lilith
+        while (input_arr.length < 10) {
+          input_arr.push(-1);
+        }
+
         const inputJson = {
-          input_data: [Array.from(projectMap.values())],
+          input_data: [input_arr],
         };
 
         const inputJsonString = JSON.stringify(inputJson);
@@ -117,7 +126,7 @@ export function useSubmitBallot({
 
         const recipe_id = kszResp.id;
 
-        await fetchKzgCommitment(recipe_id);
+        const kzg_commitment = await fetchKzgCommitment(recipe_id);
 
         const message = {
           total_votes: BigInt(sumBallot(ballot?.votes)),
@@ -130,7 +139,8 @@ export function useSubmitBallot({
         });
 
         const kzgMessage = {
-          kzg_commitment: "(0x1234, 0x5678)" as const,
+          kzg_commitment,
+          // kzg_commitment: "(0x1234, 0x5678)" as const,
         };
 
         const kzgSignature = await signTypedDataAsync({
@@ -191,7 +201,7 @@ function little_endian(proof: number[], bytes: number) {
   for (let i = 0; i < bytes; i++) {
     result = proof[i]?.toString(16) + result;
   }
-  return `0x${result}`;
+  return `0x${result}` as const;
 }
 
 async function fetchKzgCommitment(id: string) {
@@ -231,14 +241,10 @@ async function fetchKzgCommitment(id: string) {
       proof: z.array(z.number()),
     });
     const output = output_schema.parse(output_raw);
-    console.log("output", output);
 
     const proof = output.proof;
-    console.log("proof", proof);
-    console.log("proof length", proof.length);
 
     const kzg_commitment = little_endian(proof, 64);
-    console.log("kzg_commitment", kzg_commitment);
 
     return kzg_commitment;
   } catch (error) {
