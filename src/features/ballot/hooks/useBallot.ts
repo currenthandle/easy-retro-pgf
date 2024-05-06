@@ -8,6 +8,7 @@ import { api } from "~/utils/api";
 import { useSession } from "next-auth/react";
 import { keccak256 } from "viem";
 import { useSearchProjects } from "~/features/projects/hooks/useProjects";
+import { z } from "zod";
 
 export function useSaveBallot(opts?: { onSuccess?: () => void }) {
   const utils = api.useUtils();
@@ -112,7 +113,17 @@ export function useSubmitBallot({
 
         console.log("inputJsonString", inputJsonString);
 
-        await getKzgCommitment(inputJson);
+        const kszResp = await createKzgCommitment(inputJson);
+
+        if (!kszResp) {
+          return;
+        }
+
+        const recipe_id = kszResp.id;
+
+        console.log("recipe_id", recipe_id);
+
+        await fetchKzgCommitment(recipe_id);
 
         const message = {
           total_votes: BigInt(sumBallot(ballot?.votes)),
@@ -181,7 +192,66 @@ function toObject(arr: object[] = [], key: string) {
   );
 }
 
-async function getKzgCommitment(input: { input_data: number[][] }) {
+async function fetchKzgCommitment(id: string) {
+  const archon = {
+    API_KEY: "2fc6ec8d-c492-47f9-97ce-a80603dbfe4b",
+    ARCHON_URL: "https://archon-v0.ezkl.xyz",
+  };
+
+  const headers = {
+    "X-API-KEY": archon.API_KEY,
+    "Content-Type": "application/json",
+    accept: "*/*",
+  };
+
+  const req_url = `${archon.ARCHON_URL}/recipe/${id}?indices=1`;
+
+  try {
+    const response = await fetch(req_url, {
+      method: "GET",
+      headers,
+    });
+
+    const json = await response.json();
+    console.log('typeof json', typeof json[0]);
+    console.log('json', json[0]);
+
+    const output_str = json[0].output;
+    console.log("output", output_str);
+    console.log("typeof output", typeof output_str);
+
+    const output = JSON.parse(output_str);
+
+    console.log("output", output);
+
+    const proof = output.proof;
+    console.log("proof", proof);
+
+    // console.log(Object.keys(output));
+
+    // const instances = output.instances;
+    //
+    // console.log("instances", instances);
+
+    // const proof = instances[0].proof;
+    // console.log("proof", proof);
+
+    // const response_schema = z.object({
+    //   id: z.string(),
+    //   was_already_scheduled: z.boolean(),
+    // });
+    //
+    // const data = response_schema.parse(json);
+    //
+    // console.log("data", data);
+    // return data;
+  } catch (error) {
+    console.error("Error fetching KZG commitment", error);
+    return null;
+  }
+}
+
+async function createKzgCommitment(input: { input_data: number[][] }) {
   const archon = {
     // API_KEY: process.env.ARCHON_KEY!,
     // ARCHON_URL: process.env.ARCHON_URL!,
@@ -225,21 +295,25 @@ async function getKzgCommitment(input: { input_data: number[][] }) {
     data: [input],
   });
 
-  console.log("headers", headers);
-  console.log("body", body);
-  console.log('yo111111111111111111111111111')
-
   try {
     const response = await fetch(`${archon.ARCHON_URL}/recipe`, {
       method: "POST",
       headers,
-      body
+      body,
       // body: '{"commands":[{"ezkl_command":{"GenWitness":{"data":"input.json","compiled_circuit":"model.compiled","output":"witness.json"}},"working_dir":"votes-small"},{"ezkl_command":{"Prove":{"witness":"witness.json","compiled_circuit":"model.compiled","pk_path":"pk.key","proof_path":"proof.json","proof_type":"Single","check_mode":"UNSAFE"}},"working_dir":"votes-small"}],"data":[{"input_data":[[11,-1,-1,-1,-1,-1,-1,-1,-1,-1]]}]}'
     });
 
     const json: unknown = await response.json();
 
-    console.log("json", json);
+    const response_schema = z.object({
+      id: z.string(),
+      was_already_scheduled: z.boolean(),
+    });
+
+    const data = response_schema.parse(json);
+
+    console.log("data", data);
+    return data;
   } catch (error) {
     console.error("Error fetching KZG commitment", error);
     return null;
