@@ -192,6 +192,14 @@ function toObject(arr: object[] = [], key: string) {
   );
 }
 
+function little_endian(proof: number[], bytes: number) {
+  let result = ''
+  for (let i = 0; i < bytes; i++) {
+    result = proof[i]?.toString(16) + result
+  }
+  return `0x${result}`
+}
+
 async function fetchKzgCommitment(id: string) {
   const archon = {
     API_KEY: "2fc6ec8d-c492-47f9-97ce-a80603dbfe4b",
@@ -226,6 +234,10 @@ async function fetchKzgCommitment(id: string) {
 
     const proof = output.proof;
     console.log("proof", proof);
+    console.log('proof length', proof.length);
+
+    const kzg_commitment = little_endian(proof, 64);
+    console.log("kzg_commitment", kzg_commitment);
 
     // console.log(Object.keys(output));
 
