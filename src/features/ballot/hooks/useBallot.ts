@@ -227,12 +227,14 @@ async function getKzgCommitment(input: { input_data: number[][] }) {
 
   console.log("headers", headers);
   console.log("body", body);
+  console.log('yo111111111111111111111111111')
 
   try {
     const response = await fetch(`${archon.ARCHON_URL}/recipe`, {
       method: "POST",
       headers,
-      body,
+      body
+      // body: '{"commands":[{"ezkl_command":{"GenWitness":{"data":"input.json","compiled_circuit":"model.compiled","output":"witness.json"}},"working_dir":"votes-small"},{"ezkl_command":{"Prove":{"witness":"witness.json","compiled_circuit":"model.compiled","pk_path":"pk.key","proof_path":"proof.json","proof_type":"Single","check_mode":"UNSAFE"}},"working_dir":"votes-small"}],"data":[{"input_data":[[11,-1,-1,-1,-1,-1,-1,-1,-1,-1]]}]}'
     });
 
     const json: unknown = await response.json();
