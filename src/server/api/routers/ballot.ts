@@ -8,7 +8,7 @@ import {
   type Vote,
 } from "~/features/ballot/types";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { ballotTypedData } from "~/utils/typedData";
+import { ballotTypedData, kzgTypedData } from "~/utils/typedData";
 import type { db } from "~/server/db";
 import { config } from "~/config";
 import { sumBallot } from "~/features/ballot/hooks/useBallot";
@@ -92,10 +92,18 @@ export const ballotRouter = createTRPCRouter({
         });
       }
       const { signature, kzgSignature, kzgMessage } = input;
+      // TODO verify kzg signature as well
       if (!(await verifyBallotSignature({ ...input, address: voterId }))) {
         throw new TRPCError({
           code: "UNAUTHORIZED",
           message: "Signature couldn't be verified",
+        });
+      }
+
+      if (!(await verifyKZGSignature({ ...input, address: voterId }))) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "KZG Signature couldn't be verified",
         });
       }
 
@@ -140,6 +148,7 @@ async function verifyUnpublishedBallot(voterId: string, { ballot }: typeof db) {
   return existing;
 }
 
+// TODO add KZG signature verification
 async function verifyBallotSignature({
   address,
   signature,
@@ -151,5 +160,19 @@ async function verifyBallotSignature({
     address: address as Address,
     message,
     signature,
+  });
+}
+
+async function verifyKZGSignature({
+  address,
+  kzgMessage,
+  kzgSignature,
+  chainId,
+}: { address: string } & BallotPublish) {
+  return await verifyTypedData({
+    ...kzgTypedData(chainId),
+    address: address as Address,
+    message: kzgMessage,
+    signature: kzgSignature,
   });
 }
