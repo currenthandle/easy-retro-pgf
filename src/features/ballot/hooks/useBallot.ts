@@ -114,6 +114,11 @@ export function useSubmitBallot({
           input_arr.push(-1);
         }
 
+        // TODO: it seemed like there was still something coming back in the 
+        // output/proof in the response from Lilith even if the genWitness fails
+        // due to the wrong input shape
+        // We should check or do something about this
+
         const inputJson = {
           input_data: [input_arr],
         };
